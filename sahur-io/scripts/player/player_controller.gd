@@ -3,6 +3,9 @@ class_name PlayerController
 
 const ConfigStore = preload("res://scripts/core/config.gd")
 const AudioService = preload("res://scripts/core/audio_manager.gd")
+const CUSTOM_MODEL_SCENE = preload("res://resources/models/tung_tung_tung_sahur.glb")
+const VISUAL_BASE_HEIGHT := 0.18
+const CUSTOM_MODEL_TARGET_HEIGHT := 1.75
 
 signal respawn_requested(peer_id: int)
 
@@ -25,10 +28,13 @@ var body_material: StandardMaterial3D = StandardMaterial3D.new()
 var head_material: StandardMaterial3D = StandardMaterial3D.new()
 var bat_material: StandardMaterial3D = StandardMaterial3D.new()
 var local_indicator_material: StandardMaterial3D = StandardMaterial3D.new()
+var custom_model_root: Node3D = null
+var using_custom_model: bool = false
 
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var mesh_root: Node3D = $MeshRoot
 @onready var body_pivot: Node3D = $MeshRoot/BodyPivot
+@onready var model_anchor: Node3D = $MeshRoot/BodyPivot/ModelAnchor
 @onready var body_mesh: MeshInstance3D = $MeshRoot/BodyPivot/Body
 @onready var head_mesh: MeshInstance3D = $MeshRoot/BodyPivot/Head
 @onready var bat_pivot: Node3D = $MeshRoot/BodyPivot/BatPivot
@@ -50,6 +56,10 @@ func _ready() -> void:
 	if stats == null:
 		stats = PlayerStats.new(peer_id, display_name)
 		stats.reset_for_respawn(ConfigStore.player_tuning)
+	if body_pivot != null:
+		body_pivot.position.y = VISUAL_BASE_HEIGHT
+	if model_anchor != null:
+		model_anchor.position = Vector3(0.0, -VISUAL_BASE_HEIGHT, 0.0)
 	body_mesh.material_override = body_material
 	head_mesh.material_override = head_material
 	bat_mesh.material_override = bat_material
@@ -59,6 +69,7 @@ func _ready() -> void:
 	local_indicator_material.emission_enabled = true
 	local_indicator_material.emission = Color(0.24, 0.95, 0.78)
 	local_indicator_material.emission_energy_multiplier = 1.1
+	_attach_custom_model()
 	name_label.text = _get_name_label_text()
 	you_label.text = "YOU"
 	_sync_visual_state(true)
@@ -248,9 +259,17 @@ func _sync_visual_state(_instant: bool) -> void:
 		mesh_root.scale = Vector3.ONE * growth_scale
 	if collision_shape != null:
 		collision_shape.scale = Vector3.ONE * clamp(0.92 + (growth_scale - 1.0) * 0.65, 0.92, 1.6)
-	body_material.albedo_color = _get_body_color()
-	head_material.albedo_color = _get_head_color()
-	bat_material.albedo_color = _get_bat_color()
+	if using_custom_model:
+		body_mesh.visible = false
+		head_mesh.visible = false
+		bat_mesh.visible = false
+	else:
+		body_material.albedo_color = _get_body_color()
+		head_material.albedo_color = _get_head_color()
+		bat_material.albedo_color = _get_bat_color()
+		body_mesh.visible = true
+		head_mesh.visible = true
+		bat_mesh.visible = true
 	local_indicator_material.albedo_color = Color(0.24, 0.95, 0.78, 0.52)
 	if mesh_root != null:
 		mesh_root.visible = stats.alive
@@ -271,7 +290,7 @@ func _update_visuals(delta: float) -> void:
 		bat_pivot.rotation.z = -attack_swing * 1.25
 	if body_pivot != null and stats.alive:
 		var move_amount: float = clampf(Vector2(velocity.x, velocity.z).length() / maxf(ConfigStore.player_tuning.base_move_speed, 0.01), 0.0, 1.0)
-		body_pivot.position.y = 0.18 + sin(Time.get_ticks_msec() * 0.015) * 0.04 * move_amount
+		body_pivot.position.y = VISUAL_BASE_HEIGHT + sin(Time.get_ticks_msec() * 0.015) * 0.04 * move_amount
 	if local_indicator != null and local_indicator.visible:
 		var pulse := 1.0 + sin(Time.get_ticks_msec() * 0.01) * 0.06
 		var target_scale := _get_local_indicator_base_scale(growth.get_scale(stats, ConfigStore.player_tuning)) * pulse
@@ -301,3 +320,67 @@ func _get_name_label_text() -> String:
 
 func _get_local_indicator_base_scale(growth_scale: float) -> float:
 	return clamp(0.95 + (growth_scale - 1.0) * 0.3, 0.95, 1.35)
+
+func _attach_custom_model() -> void:
+	if model_anchor == null or custom_model_root != null:
+		return
+	if CUSTOM_MODEL_SCENE == null:
+		return
+	var instance := CUSTOM_MODEL_SCENE.instantiate() as Node3D
+	if instance == null:
+		return
+	instance.name = "ImportedModel"
+	model_anchor.add_child(instance)
+	_fit_custom_model(instance)
+	custom_model_root = instance
+	using_custom_model = true
+
+func _fit_custom_model(instance: Node3D) -> void:
+	var bounds := _get_custom_model_bounds(instance)
+	if bounds.size.y <= 0.001:
+		return
+	var scale_factor := CUSTOM_MODEL_TARGET_HEIGHT / bounds.size.y
+	instance.scale = Vector3.ONE * scale_factor
+	bounds = _get_custom_model_bounds(instance)
+	var center_x := bounds.position.x + bounds.size.x * 0.5
+	var center_z := bounds.position.z + bounds.size.z * 0.5
+	instance.position = Vector3(-center_x, -bounds.position.y, -center_z)
+
+func _get_custom_model_bounds(root: Node3D) -> AABB:
+	var mesh_instances: Array[MeshInstance3D] = []
+	_collect_model_meshes(root, mesh_instances)
+	var has_bounds := false
+	var combined := AABB()
+	var root_inverse := root.global_transform.affine_inverse()
+	for mesh_instance in mesh_instances:
+		if mesh_instance == null or mesh_instance.mesh == null:
+			continue
+		var relative_transform := root_inverse * mesh_instance.global_transform
+		for corner in _get_aabb_corners(mesh_instance.get_aabb()):
+			var point := relative_transform * corner
+			if not has_bounds:
+				combined = AABB(point, Vector3.ZERO)
+				has_bounds = true
+			else:
+				combined = combined.expand(point)
+	return combined if has_bounds else AABB(Vector3.ZERO, Vector3.ZERO)
+
+func _collect_model_meshes(node: Node, mesh_instances: Array[MeshInstance3D]) -> void:
+	if node is MeshInstance3D:
+		mesh_instances.append(node as MeshInstance3D)
+	for child in node.get_children():
+		_collect_model_meshes(child, mesh_instances)
+
+func _get_aabb_corners(bounds: AABB) -> PackedVector3Array:
+	var min_point := bounds.position
+	var max_point := bounds.position + bounds.size
+	return PackedVector3Array([
+		Vector3(min_point.x, min_point.y, min_point.z),
+		Vector3(max_point.x, min_point.y, min_point.z),
+		Vector3(min_point.x, max_point.y, min_point.z),
+		Vector3(max_point.x, max_point.y, min_point.z),
+		Vector3(min_point.x, min_point.y, max_point.z),
+		Vector3(max_point.x, min_point.y, max_point.z),
+		Vector3(min_point.x, max_point.y, max_point.z),
+		Vector3(max_point.x, max_point.y, max_point.z)
+	])

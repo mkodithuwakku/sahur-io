@@ -35,7 +35,9 @@ shape = SubResource("1")
 [node name="MeshRoot" type="Node3D" parent="."]
 
 [node name="BodyPivot" type="Node3D" parent="MeshRoot"]
-position = Vector3(0, 0.95, 0)
+position = Vector3(0, 0.18, 0)
+
+[node name="ModelAnchor" type="Node3D" parent="MeshRoot/BodyPivot"]
 
 [node name="Body" type="MeshInstance3D" parent="MeshRoot/BodyPivot"]
 mesh = SubResource("2")
