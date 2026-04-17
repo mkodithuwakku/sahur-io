@@ -76,6 +76,7 @@ godot --headless --path sahur-io --quit
 
 ## Documentation
 
+- [First-Time Godot Import](./FIRST_TIME_GODOT_IMPORT.md)
 - [Current Context](./context.md)
 - [Architecture Overview](./docs/architecture/overview.md)
 - [Development Phases](./docs/phases/README.md)
