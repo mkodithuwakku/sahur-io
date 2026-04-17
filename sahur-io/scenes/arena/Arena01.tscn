@@ -1,0 +1,145 @@
+[gd_scene load_steps=18 format=3]
+
+[ext_resource type="Script" path="res://scripts/arena/arena_manager.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/arena/SpawnPoint.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/arena/Obstacle_Rock.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://scenes/arena/Obstacle_Crate.tscn" id="4"]
+
+[sub_resource type="BoxShape3D" id="1"]
+size = Vector3(40, 0.4, 40)
+
+[sub_resource type="BoxMesh" id="2"]
+size = Vector3(40, 0.4, 40)
+
+[sub_resource type="StandardMaterial3D" id="3"]
+albedo_color = Color(0.88, 0.83, 0.57, 1)
+roughness = 0.95
+
+[sub_resource type="BoxShape3D" id="4"]
+size = Vector3(41, 2, 1)
+
+[sub_resource type="BoxMesh" id="5"]
+size = Vector3(41, 2, 1)
+
+[sub_resource type="BoxShape3D" id="6"]
+size = Vector3(1, 2, 41)
+
+[sub_resource type="BoxMesh" id="7"]
+size = Vector3(1, 2, 41)
+
+[sub_resource type="StandardMaterial3D" id="8"]
+albedo_color = Color(0.72, 0.22, 0.2, 1)
+roughness = 0.88
+
+[node name="Arena01" type="Node3D"]
+script = ExtResource("1")
+bounds_extents = Vector2(19, 19)
+
+[node name="Ground" type="StaticBody3D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground"]
+position = Vector3(0, -0.2, 0)
+shape = SubResource("1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground"]
+position = Vector3(0, -0.2, 0)
+mesh = SubResource("2")
+material_override = SubResource("3")
+
+[node name="Walls" type="Node3D" parent="."]
+
+[node name="NorthWall" type="StaticBody3D" parent="Walls"]
+position = Vector3(0, 1, -20)
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Walls/NorthWall"]
+shape = SubResource("4")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Walls/NorthWall"]
+mesh = SubResource("5")
+material_override = SubResource("8")
+
+[node name="SouthWall" type="StaticBody3D" parent="Walls"]
+position = Vector3(0, 1, 20)
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Walls/SouthWall"]
+shape = SubResource("4")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Walls/SouthWall"]
+mesh = SubResource("5")
+material_override = SubResource("8")
+
+[node name="WestWall" type="StaticBody3D" parent="Walls"]
+position = Vector3(-20, 1, 0)
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Walls/WestWall"]
+shape = SubResource("6")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Walls/WestWall"]
+mesh = SubResource("7")
+material_override = SubResource("8")
+
+[node name="EastWall" type="StaticBody3D" parent="Walls"]
+position = Vector3(20, 1, 0)
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Walls/EastWall"]
+shape = SubResource("6")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Walls/EastWall"]
+mesh = SubResource("7")
+material_override = SubResource("8")
+
+[node name="Obstacles" type="Node3D" parent="."]
+
+[node name="RockCenter" parent="Obstacles" instance=ExtResource("3")]
+position = Vector3(0, 0, 0)
+
+[node name="RockWest" parent="Obstacles" instance=ExtResource("3")]
+position = Vector3(-8, 0, 5)
+
+[node name="RockEast" parent="Obstacles" instance=ExtResource("3")]
+position = Vector3(8, 0, -6)
+
+[node name="CrateNorth" parent="Obstacles" instance=ExtResource("4")]
+position = Vector3(-4, 0, -8)
+
+[node name="CrateSouth" parent="Obstacles" instance=ExtResource("4")]
+position = Vector3(5, 0, 9)
+
+[node name="CrateEast" parent="Obstacles" instance=ExtResource("4")]
+position = Vector3(11, 0, 4)
+
+[node name="SpawnPoints" type="Node3D" parent="."]
+
+[node name="Spawn_NW" parent="SpawnPoints" instance=ExtResource("2")]
+position = Vector3(-14, 0, -14)
+
+[node name="Spawn_NE" parent="SpawnPoints" instance=ExtResource("2")]
+position = Vector3(14, 0, -14)
+
+[node name="Spawn_SW" parent="SpawnPoints" instance=ExtResource("2")]
+position = Vector3(-14, 0, 14)
+
+[node name="Spawn_SE" parent="SpawnPoints" instance=ExtResource("2")]
+position = Vector3(14, 0, 14)
+
+[node name="Spawn_W" parent="SpawnPoints" instance=ExtResource("2")]
+position = Vector3(-17, 0, 0)
+
+[node name="Spawn_E" parent="SpawnPoints" instance=ExtResource("2")]
+position = Vector3(17, 0, 0)
+
+[node name="Spawn_N" parent="SpawnPoints" instance=ExtResource("2")]
+position = Vector3(0, 0, -17)
+
+[node name="Spawn_S" parent="SpawnPoints" instance=ExtResource("2")]
+position = Vector3(0, 0, 17)

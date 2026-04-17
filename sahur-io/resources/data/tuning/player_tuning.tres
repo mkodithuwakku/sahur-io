@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="PlayerTuning" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/player_tuning.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+base_move_speed = 8.5
+acceleration = 24.0
+base_health = 100.0
+health_per_growth = 18.0
+scale_per_growth = 0.12
+speed_penalty_per_growth = 0.08
+max_growth_level = 8
+base_scale = 1.0
+camera_height = 18.0
+camera_distance = 15.0
+camera_step_per_growth = 1.0
+knockback_resistance_per_growth = 0.06

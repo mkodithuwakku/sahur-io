@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="MatchTuning" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/match_tuning.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+respawn_delay = 3.0
+snapshot_rate = 15.0
+input_send_rate = 20.0
+max_players = 12
+spawn_safety_radius = 8.0
+leaderboard_size = 5
+desync_snap_distance = 2.4
+network_port = 7000
