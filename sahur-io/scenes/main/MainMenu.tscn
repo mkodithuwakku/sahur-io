@@ -12,55 +12,165 @@ script = ExtResource("1")
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-color = Color(0.12, 0.17, 0.12, 1)
+color = Color(0.05, 0.07, 0.09, 1)
 
-[node name="Center" type="CenterContainer" parent="."]
+[node name="Shell" type="MarginContainer" parent="."]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = 42.0
+offset_top = 42.0
+offset_right = -42.0
+offset_bottom = -42.0
 
-[node name="VBox" type="VBoxContainer" parent="Center"]
-custom_minimum_size = Vector2(460, 0)
+[node name="Center" type="CenterContainer" parent="Shell"]
+layout_mode = 2
+
+[node name="Frame" type="PanelContainer" parent="Shell/Center"]
+custom_minimum_size = Vector2(1100, 0)
+modulate = Color(1, 1, 1, 0)
+
+[node name="Margin" type="MarginContainer" parent="Shell/Center/Frame"]
+theme_override_constants/margin_left = 34
+theme_override_constants/margin_top = 34
+theme_override_constants/margin_right = 34
+theme_override_constants/margin_bottom = 34
+
+[node name="Content" type="HBoxContainer" parent="Shell/Center/Frame/Margin"]
+theme_override_constants/separation = 30
+
+[node name="HeroColumn" type="VBoxContainer" parent="Shell/Center/Frame/Margin/Content"]
+size_flags_horizontal = 3
+theme_override_constants/separation = 18
+
+[node name="Eyebrow" type="Label" parent="Shell/Center/Frame/Margin/Content/HeroColumn"]
+text = "AUTHORITATIVE MULTIPLAYER MVP"
+
+[node name="TitleBlock" type="VBoxContainer" parent="Shell/Center/Frame/Margin/Content/HeroColumn"]
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Shell/Center/Frame/Margin/Content/HeroColumn/TitleBlock"]
+text = "Tun Tun Tung\nSahur Arena"
+
+[node name="Subtitle" type="Label" parent="Shell/Center/Frame/Margin/Content/HeroColumn/TitleBlock"]
+custom_minimum_size = Vector2(0, 84)
+autowrap_mode = 3
+text = "Jump into a fast top-down brawler where every confirmed kill makes you larger, stronger, and harder to ignore."
+
+[node name="HeroPills" type="VBoxContainer" parent="Shell/Center/Frame/Margin/Content/HeroColumn"]
+theme_override_constants/separation = 10
+
+[node name="PillPrimary" type="PanelContainer" parent="Shell/Center/Frame/Margin/Content/HeroColumn/HeroPills"]
+
+[node name="Margin" type="MarginContainer" parent="Shell/Center/Frame/Margin/Content/HeroColumn/HeroPills/PillPrimary"]
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
+
+[node name="Label" type="Label" parent="Shell/Center/Frame/Margin/Content/HeroColumn/HeroPills/PillPrimary/Margin"]
+text = "Drop in instantly with host or LAN join flow"
+
+[node name="PillSecondary" type="PanelContainer" parent="Shell/Center/Frame/Margin/Content/HeroColumn/HeroPills"]
+
+[node name="Margin" type="MarginContainer" parent="Shell/Center/Frame/Margin/Content/HeroColumn/HeroPills/PillSecondary"]
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
+
+[node name="Label" type="Label" parent="Shell/Center/Frame/Margin/Content/HeroColumn/HeroPills/PillSecondary/Margin"]
+text = "Authoritative melee combat, respawns, and growth"
+
+[node name="PillTertiary" type="PanelContainer" parent="Shell/Center/Frame/Margin/Content/HeroColumn/HeroPills"]
+
+[node name="Margin" type="MarginContainer" parent="Shell/Center/Frame/Margin/Content/HeroColumn/HeroPills/PillTertiary"]
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
+
+[node name="Label" type="Label" parent="Shell/Center/Frame/Margin/Content/HeroColumn/HeroPills/PillTertiary/Margin"]
+text = "Mobile-first controls with desktop debug fallback"
+
+[node name="Footer" type="Label" parent="Shell/Center/Frame/Margin/Content/HeroColumn"]
+custom_minimum_size = Vector2(0, 60)
+autowrap_mode = 3
+text = "Use Host Match for same-machine testing, or join a running session with an IP address on your LAN."
+
+[node name="Divider" type="ColorRect" parent="Shell/Center/Frame/Margin/Content"]
+custom_minimum_size = Vector2(1, 420)
+color = Color(1, 1, 1, 0.08)
+
+[node name="ActionColumn" type="VBoxContainer" parent="Shell/Center/Frame/Margin/Content"]
+custom_minimum_size = Vector2(420, 0)
 theme_override_constants/separation = 12
 
-[node name="Title" type="Label" parent="Center/VBox"]
-text = "Tun Tun Tung Sahur Arena"
-horizontal_alignment = 1
+[node name="ActionHeading" type="Label" parent="Shell/Center/Frame/Margin/Content/ActionColumn"]
+text = "Enter The Arena"
 
-[node name="Subtitle" type="Label" parent="Center/VBox"]
-text = "Host or join a chaotic bat battle."
-horizontal_alignment = 1
+[node name="NameLabel" type="Label" parent="Shell/Center/Frame/Margin/Content/ActionColumn"]
+text = "PLAYER NAME"
 
-[node name="NameInput" type="LineEdit" parent="Center/VBox"]
+[node name="NameInput" type="LineEdit" parent="Shell/Center/Frame/Margin/Content/ActionColumn"]
+custom_minimum_size = Vector2(0, 64)
 placeholder_text = "Guest name"
 
-[node name="IPInput" type="LineEdit" parent="Center/VBox"]
+[node name="IPLabel" type="Label" parent="Shell/Center/Frame/Margin/Content/ActionColumn"]
+text = "SERVER IP"
+
+[node name="IPInput" type="LineEdit" parent="Shell/Center/Frame/Margin/Content/ActionColumn"]
+custom_minimum_size = Vector2(0, 64)
 placeholder_text = "Server IP"
 text = "127.0.0.1"
 
-[node name="StatusLabel" type="Label" parent="Center/VBox"]
+[node name="StatusCard" type="PanelContainer" parent="Shell/Center/Frame/Margin/Content/ActionColumn"]
+
+[node name="Margin" type="MarginContainer" parent="Shell/Center/Frame/Margin/Content/ActionColumn/StatusCard"]
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 16
+
+[node name="StatusLabel" type="Label" parent="Shell/Center/Frame/Margin/Content/ActionColumn/StatusCard/Margin"]
 autowrap_mode = 3
 text = "Ready"
 
-[node name="Buttons" type="HBoxContainer" parent="Center/VBox"]
-theme_override_constants/separation = 10
-alignment = 1
+[node name="Buttons" type="VBoxContainer" parent="Shell/Center/Frame/Margin/Content/ActionColumn"]
+theme_override_constants/separation = 14
 
-[node name="HostButton" type="Button" parent="Center/VBox/Buttons"]
-custom_minimum_size = Vector2(120, 48)
+[node name="TopRow" type="HBoxContainer" parent="Shell/Center/Frame/Margin/Content/ActionColumn/Buttons"]
+theme_override_constants/separation = 14
+
+[node name="HostButton" type="Button" parent="Shell/Center/Frame/Margin/Content/ActionColumn/Buttons/TopRow"]
+custom_minimum_size = Vector2(0, 76)
+size_flags_horizontal = 3
 text = "Host Match"
 
-[node name="JoinButton" type="Button" parent="Center/VBox/Buttons"]
-custom_minimum_size = Vector2(120, 48)
+[node name="JoinButton" type="Button" parent="Shell/Center/Frame/Margin/Content/ActionColumn/Buttons/TopRow"]
+custom_minimum_size = Vector2(0, 76)
+size_flags_horizontal = 3
 text = "Join Match"
 
-[node name="SettingsButton" type="Button" parent="Center/VBox/Buttons"]
-custom_minimum_size = Vector2(120, 48)
+[node name="BottomRow" type="HBoxContainer" parent="Shell/Center/Frame/Margin/Content/ActionColumn/Buttons"]
+theme_override_constants/separation = 14
+
+[node name="SettingsButton" type="Button" parent="Shell/Center/Frame/Margin/Content/ActionColumn/Buttons/BottomRow"]
+custom_minimum_size = Vector2(0, 72)
+size_flags_horizontal = 3
 text = "Settings"
 
-[node name="QuitButton" type="Button" parent="Center/VBox/Buttons"]
-custom_minimum_size = Vector2(120, 48)
+[node name="QuitButton" type="Button" parent="Shell/Center/Frame/Margin/Content/ActionColumn/Buttons/BottomRow"]
+custom_minimum_size = Vector2(0, 72)
+size_flags_horizontal = 3
 text = "Quit"
+
+[node name="SettingsBackdrop" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+visible = false
+color = Color(0.01, 0.02, 0.04, 0.64)
 
 [node name="SettingsPanel" type="PanelContainer" parent="."]
 anchors_preset = 8
@@ -68,24 +178,28 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -180.0
-offset_top = -130.0
-offset_right = 180.0
-offset_bottom = 130.0
+offset_left = -240.0
+offset_top = -180.0
+offset_right = 240.0
+offset_bottom = 180.0
 visible = false
+modulate = Color(1, 1, 1, 0)
 
 [node name="Margin" type="MarginContainer" parent="SettingsPanel"]
-theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 14
-theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 14
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 22
 
 [node name="VBox" type="VBoxContainer" parent="SettingsPanel/Margin"]
-theme_override_constants/separation = 10
+theme_override_constants/separation = 12
 
 [node name="Heading" type="Label" parent="SettingsPanel/Margin/VBox"]
 text = "Settings"
-horizontal_alignment = 1
+
+[node name="Copy" type="Label" parent="SettingsPanel/Margin/VBox"]
+autowrap_mode = 3
+text = "Keep the menu clean and readable while you dial in the audio mix and mobile vibration."
 
 [node name="MusicLabel" type="Label" parent="SettingsPanel/Margin/VBox"]
 text = "Music Volume"
@@ -108,4 +222,5 @@ text = "Enable Vibration"
 button_pressed = true
 
 [node name="CloseButton" type="Button" parent="SettingsPanel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 58)
 text = "Close"

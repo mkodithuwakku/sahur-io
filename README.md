@@ -39,6 +39,12 @@ From the repository root:
 godot --path sahur-io
 ```
 
+Or use the included launcher script:
+
+```bash
+./run_game.sh
+```
+
 You can also open the project manually in the Godot editor by selecting the `sahur-io/project.godot` file.
 
 ## Local Multiplayer Test
