@@ -1,4 +1,6 @@
-# Phase 01 - MVP Foundation
+# Historical Snapshot - MVP Foundation
+
+Use [docs/phases/README.md](./README.md) for the current phase roadmap. This file records the first delivered playable slice before the roadmap was expanded into implementation phases.
 
 ## Goals
 
@@ -18,4 +20,4 @@
 
 - Add production-ready audio, VFX, and animation assets
 - Tune mobile performance and combat feel on real devices
-- Add automated gameplay validation and wider multiplayer testing
+- Expand automated and multiplayer soak validation as the project approaches release

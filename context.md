@@ -5,7 +5,7 @@
 - Product: `Tun Tun Tung Sahur Arena`
 - Engine: Godot 4.x
 - Godot project root: `/Users/mkodi/Personal Coding/Sahur-io/sahur-io`
-- Current milestone: playable MVP foundation with arena combat, growth, respawn, HUD, and LAN-style host/join flow
+- Current milestone: playable MVP foundation with phased implementation docs and headless gameplay test coverage
 
 ## Key Commands
 
@@ -13,6 +13,7 @@
 godot --path sahur-io
 godot --headless --path sahur-io -- --server
 godot --headless --path sahur-io --quit
+godot --headless --path sahur-io --script res://tests/run_tests.gd
 ```
 
 ## Core Runtime Pieces
@@ -43,6 +44,7 @@ When continuing development:
 1. Add or update a phase document in `docs/phases/`.
 2. Update `docs/architecture/overview.md` if architecture changes.
 3. Refresh this file with the new current milestone, changed commands, and important risks.
+4. Extend `docs/testing.md` and `sahur-io/tests/` when gameplay rules or networking behavior change.
 
 ## Known Risks
 

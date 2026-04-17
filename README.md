@@ -74,9 +74,16 @@ godot --path sahur-io
 godot --headless --path sahur-io --quit
 ```
 
+## Automated Tests
+
+```bash
+godot --headless --path sahur-io --script res://tests/run_tests.gd
+```
+
 ## Documentation
 
 - [First-Time Godot Import](./FIRST_TIME_GODOT_IMPORT.md)
 - [Current Context](./context.md)
 - [Architecture Overview](./docs/architecture/overview.md)
+- [Testing Guide](./docs/testing.md)
 - [Development Phases](./docs/phases/README.md)
