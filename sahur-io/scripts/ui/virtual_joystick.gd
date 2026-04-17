@@ -9,10 +9,13 @@ var _vector: Vector2 = Vector2.ZERO
 var _touch_id: int = -1
 
 @onready var knob: Control = $Knob
+@onready var background: Control = $Background
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(radius * 2.4, radius * 2.4)
-	mouse_filter = Control.MOUSE_FILTER_PASS
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	knob.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_reset_knob()
 
 func get_vector() -> Vector2:

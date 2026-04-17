@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/player/player_controller.gd" id="1"]
 
@@ -16,6 +16,12 @@ height = 0.56
 
 [sub_resource type="BoxMesh" id="4"]
 size = Vector3(0.14, 0.14, 1.55)
+
+[sub_resource type="TorusMesh" id="5"]
+inner_radius = 0.62
+outer_radius = 0.82
+ring_sides = 10
+ring_segments = 28
 
 [node name="Player" type="CharacterBody3D"]
 script = ExtResource("1")
@@ -45,9 +51,20 @@ position = Vector3(0.52, 0.32, 0.08)
 rotation = Vector3(0.2, 0, 1.05)
 mesh = SubResource("4")
 
+[node name="LocalIndicator" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.08, 0)
+mesh = SubResource("5")
+
 [node name="NameLabel" type="Label3D" parent="."]
 position = Vector3(0, 2.45, 0)
 billboard = 1
 modulate = Color(1, 1, 1, 0.95)
 pixel_size = 0.005
 text = "Guest"
+
+[node name="YouLabel" type="Label3D" parent="."]
+position = Vector3(0, 2.88, 0)
+billboard = 1
+modulate = Color(0.5, 1, 0.88, 0.95)
+pixel_size = 0.0055
+text = "YOU"

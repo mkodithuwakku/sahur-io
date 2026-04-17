@@ -69,7 +69,7 @@ theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 12
 
 [node name="Label" type="Label" parent="Shell/Center/Frame/Margin/Content/HeroColumn/HeroPills/PillPrimary/Margin"]
-text = "Drop in instantly with host or LAN join flow"
+text = "Jump straight into a local arena with CPU opponents"
 
 [node name="PillSecondary" type="PanelContainer" parent="Shell/Center/Frame/Margin/Content/HeroColumn/HeroPills"]
 
@@ -96,7 +96,7 @@ text = "Mobile-first controls with desktop debug fallback"
 [node name="Footer" type="Label" parent="Shell/Center/Frame/Margin/Content/HeroColumn"]
 custom_minimum_size = Vector2(0, 60)
 autowrap_mode = 3
-text = "Use Host Match for same-machine testing, or join a running session with an IP address on your LAN."
+text = "Use Local Prototype for quick offline combat, Host Match for same-machine testing, or Join Match with a LAN IP."
 
 [node name="Divider" type="ColorRect" parent="Shell/Center/Frame/Margin/Content"]
 custom_minimum_size = Vector2(1, 420)
@@ -138,6 +138,10 @@ text = "Ready"
 
 [node name="Buttons" type="VBoxContainer" parent="Shell/Center/Frame/Margin/Content/ActionColumn"]
 theme_override_constants/separation = 14
+
+[node name="LocalPrototypeButton" type="Button" parent="Shell/Center/Frame/Margin/Content/ActionColumn/Buttons"]
+custom_minimum_size = Vector2(0, 78)
+text = "Local Prototype"
 
 [node name="TopRow" type="HBoxContainer" parent="Shell/Center/Frame/Margin/Content/ActionColumn/Buttons"]
 theme_override_constants/separation = 14

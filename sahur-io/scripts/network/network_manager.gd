@@ -37,6 +37,12 @@ static func close_peer() -> void:
 	if instance != null:
 		instance._close_peer()
 
+static func set_connection_status(status: String) -> void:
+	if instance != null:
+		instance._set_status(status)
+	else:
+		last_status = status
+
 static func is_server() -> bool:
 	return instance != null and instance.multiplayer.has_multiplayer_peer() and instance.multiplayer.is_server()
 
@@ -47,7 +53,7 @@ static func is_online() -> bool:
 	return instance != null and instance.multiplayer.has_multiplayer_peer()
 
 static func get_local_peer_id() -> int:
-	if instance == null:
+	if instance == null or not instance.multiplayer.has_multiplayer_peer():
 		return 0
 	return instance.multiplayer.get_unique_id()
 

@@ -8,6 +8,7 @@ const TestSpawnManager = preload("res://tests/cases/test_spawn_manager.gd")
 const TestServerGameState = preload("res://tests/cases/test_server_game_state.gd")
 const TestReplicationHelpers = preload("res://tests/cases/test_replication_helpers.gd")
 const TestPlayerController = preload("res://tests/cases/test_player_controller.gd")
+const TestLocalBotController = preload("res://tests/cases/test_local_bot_controller.gd")
 
 func _init() -> void:
 	call_deferred("_run")
@@ -21,7 +22,8 @@ func _run() -> void:
 		TestSpawnManager.new(),
 		TestServerGameState.new(),
 		TestReplicationHelpers.new(),
-		TestPlayerController.new()
+		TestPlayerController.new(),
+		TestLocalBotController.new()
 	]
 	var total_tests: int = 0
 	var total_assertions: int = 0

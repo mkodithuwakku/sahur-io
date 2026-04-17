@@ -6,12 +6,17 @@ const NetworkService = preload("res://scripts/network/network_manager.gd")
 const GameDirector = preload("res://scripts/core/game_manager.gd")
 const ConfigStore = preload("res://scripts/core/config.gd")
 const EventBusHub = preload("res://scripts/core/event_bus.gd")
+const LocalBotController = preload("res://scripts/player/local_bot_controller.gd")
+
+const LOCAL_PROTOTYPE_PLAYER_PEER_ID := 1
+const LOCAL_BOT_PEER_ID_START := 1000
 
 var server_state: ServerGameState = ServerGameState.new()
 var spawn_manager: SpawnManager
 var snapshot_replicator: ReplicationManager = ReplicationManager.new()
 var input_replicator: ReplicationManager = ReplicationManager.new()
 var player_nodes: Dictionary = {}
+var bot_controllers: Dictionary = {}
 var join_requested: bool = false
 var local_player: PlayerController = null
 
@@ -30,7 +35,12 @@ func _ready() -> void:
 	NetworkService.instance.connection_status_changed.connect(hud.set_connection_status)
 	hud.leave_requested.connect(_on_leave_requested)
 	hud.set_connection_status(NetworkService.last_status)
-	if NetworkService.is_server() and not _is_dedicated_server_mode():
+	if GameDirector.is_local_prototype_mode():
+		var local_spawn: Vector3 = _choose_spawn(LOCAL_PROTOTYPE_PLAYER_PEER_ID)
+		_spawn_player_local(LOCAL_PROTOTYPE_PLAYER_PEER_ID, NetworkService.local_player_name, local_spawn)
+		_spawn_local_bots(GameDirector.get_local_prototype_cpu_count())
+		_broadcast_snapshot()
+	elif NetworkService.is_server() and not _is_dedicated_server_mode():
 		var host_spawn: Vector3 = _choose_spawn(multiplayer.get_unique_id())
 		_spawn_player_everywhere(multiplayer.get_unique_id(), NetworkService.local_player_name, host_spawn)
 	elif NetworkService.is_client() and NetworkService.last_status.begins_with("Connected"):
@@ -41,7 +51,9 @@ func _physics_process(delta: float) -> void:
 		_on_leave_requested()
 		return
 	_collect_local_input(delta)
-	if NetworkService.is_server() and snapshot_replicator.tick(delta, ConfigStore.match_tuning.snapshot_rate):
+	if GameDirector.is_local_prototype_mode() and _has_authority():
+		_update_local_bots()
+	if _has_authority() and snapshot_replicator.tick(delta, ConfigStore.match_tuning.snapshot_rate):
 		_broadcast_snapshot()
 	_update_camera(delta)
 	_update_hud()
@@ -104,7 +116,7 @@ func _collect_local_input(delta: float) -> void:
 		return
 	var move_input: Vector2 = hud.get_move_vector()
 	local_player.set_input_vector(move_input)
-	if not NetworkService.is_server() and input_replicator.tick(delta, ConfigStore.match_tuning.input_send_rate):
+	if not GameDirector.is_local_prototype_mode() and not NetworkService.is_server() and input_replicator.tick(delta, ConfigStore.match_tuning.input_send_rate):
 		rpc_id(1, "_server_receive_input", move_input)
 	if hud.consume_attack_pressed():
 		var attack_facing: Vector3 = local_player.get_attack_facing()
@@ -112,22 +124,27 @@ func _collect_local_input(delta: float) -> void:
 			attack_facing = Vector3(move_input.x, 0.0, move_input.y).normalized()
 		local_player.set_attack_facing(attack_facing)
 		if local_player.begin_attack_preview():
-			if NetworkService.is_server():
+			if _has_authority():
 				_handle_attack_for_peer(local_player.peer_id, attack_facing)
 			else:
 				rpc_id(1, "_server_receive_attack", attack_facing)
 
-func _handle_attack_for_peer(peer_id: int, facing: Vector3) -> void:
+func _handle_attack_for_peer(peer_id: int, facing: Vector3, should_broadcast: bool = true) -> bool:
 	var player := server_state.get_player(peer_id) as PlayerController
 	if player == null:
-		return
+		return false
+	if not player.stats.alive or not player.combat.can_attack():
+		return false
 	player.set_attack_facing(facing)
 	var hits: Array = player.server_process_attack(server_state.get_players())
-	rpc("_play_attack_remote", peer_id)
+	if NetworkService.is_online():
+		rpc("_play_attack_remote", peer_id)
 	for hit in hits:
 		if hit.get("defeated", false):
 			player.server_register_kill()
-	_broadcast_snapshot()
+	if should_broadcast:
+		_broadcast_snapshot()
+	return true
 
 func _request_join_once() -> void:
 	if join_requested:
@@ -137,24 +154,38 @@ func _request_join_once() -> void:
 
 func _spawn_player_everywhere(peer_id: int, player_name: String, spawn_position: Vector3) -> void:
 	_spawn_player_local(peer_id, player_name, spawn_position)
-	rpc("_spawn_player_remote", peer_id, player_name, spawn_position)
+	if NetworkService.is_online():
+		rpc("_spawn_player_remote", peer_id, player_name, spawn_position)
 
 func _spawn_player_local(peer_id: int, player_name: String, spawn_position: Vector3) -> PlayerController:
 	if player_nodes.has(peer_id):
 		return player_nodes[peer_id]
 	var player := PLAYER_SCENE.instantiate() as PlayerController
 	player.name = "Player_%d" % peer_id
-	player.setup(peer_id, player_name, multiplayer.get_unique_id(), NetworkService.is_server(), arena.bounds_extents)
-	player.global_position = spawn_position
+	var local_peer_id: int = NetworkService.get_local_peer_id() if NetworkService.is_online() else LOCAL_PROTOTYPE_PLAYER_PEER_ID
+	var has_server_authority: bool = NetworkService.is_server() or GameDirector.is_local_prototype_mode()
+	player.setup(peer_id, player_name, local_peer_id, has_server_authority, arena.bounds_extents)
 	players_root.add_child(player)
+	player.global_position = spawn_position
 	player.respawn_requested.connect(_on_player_respawn_requested)
 	player_nodes[peer_id] = player
-	if NetworkService.is_server():
+	if has_server_authority:
 		server_state.register_player(peer_id, player_name, player)
-	if peer_id == multiplayer.get_unique_id() and not _is_dedicated_server_mode():
+	if peer_id == local_peer_id and not _is_dedicated_server_mode():
 		local_player = player
 		EventBusHub.instance.local_player_changed.emit(peer_id)
 	return player
+
+func _spawn_local_bots(cpu_count: int) -> void:
+	for index in range(cpu_count):
+		var bot_peer_id := LOCAL_BOT_PEER_ID_START + index + 1
+		if player_nodes.has(bot_peer_id):
+			continue
+		var bot_name := "CPU %d" % (index + 1)
+		var bot := _spawn_player_local(bot_peer_id, bot_name, _choose_spawn(bot_peer_id))
+		bot.set_attack_facing(Vector3.FORWARD.rotated(Vector3.UP, float(index) * 1.3))
+		bot_controllers[bot_peer_id] = LocalBotController.new(bot_peer_id)
+	_broadcast_snapshot()
 
 func _remove_player_local(peer_id: int) -> void:
 	var player := player_nodes.get(peer_id, null) as PlayerController
@@ -163,8 +194,9 @@ func _remove_player_local(peer_id: int) -> void:
 	if local_player == player:
 		local_player = null
 	player_nodes.erase(peer_id)
-	if NetworkService.is_server():
+	if _has_authority():
 		server_state.unregister_player(peer_id)
+	bot_controllers.erase(peer_id)
 	player.queue_free()
 
 func _sync_existing_players_to(peer_id: int) -> void:
@@ -175,11 +207,12 @@ func _send_snapshot_to(peer_id: int) -> void:
 	rpc_id(peer_id, "_receive_world_snapshot", server_state.build_snapshot())
 
 func _broadcast_snapshot() -> void:
-	if not NetworkService.is_server():
+	if not _has_authority():
 		return
 	var snapshot: Dictionary = server_state.build_snapshot()
 	_apply_snapshot(snapshot)
-	rpc("_receive_world_snapshot", snapshot)
+	if NetworkService.is_online():
+		rpc("_receive_world_snapshot", snapshot)
 
 func _apply_snapshot(snapshot: Dictionary) -> void:
 	var leaderboard_entries: Array = snapshot.get("leaderboard", [])
@@ -193,7 +226,8 @@ func _apply_snapshot(snapshot: Dictionary) -> void:
 		var player := player_nodes.get(peer_id, null) as PlayerController
 		if player != null:
 			player.apply_state_snapshot(state)
-			if peer_id == multiplayer.get_unique_id() and not _is_dedicated_server_mode():
+			var local_peer_id: int = NetworkService.get_local_peer_id() if NetworkService.is_online() else LOCAL_PROTOTYPE_PLAYER_PEER_ID
+			if peer_id == local_peer_id and not _is_dedicated_server_mode():
 				local_player = player
 
 func _update_camera(delta: float) -> void:
@@ -203,6 +237,10 @@ func _update_camera(delta: float) -> void:
 	camera.position = camera.position.lerp(ConfigStore.player_tuning.get_camera_offset(local_player.stats.growth_level), clamp(delta * 5.0, 0.0, 1.0))
 
 func _update_hud() -> void:
+	if GameDirector.is_local_prototype_mode():
+		var leaderboard_entries: Array = server_state.build_leaderboard(ConfigStore.match_tuning.leaderboard_size)
+		hud.set_leaderboard(leaderboard_entries)
+		EventBusHub.instance.leaderboard_updated.emit(leaderboard_entries)
 	if local_player == null:
 		hud.set_local_state({})
 		return
@@ -213,6 +251,41 @@ func _choose_spawn(excluded_peer_id: int) -> Vector3:
 	var occupied: Array[Vector3] = server_state.get_active_positions(excluded_peer_id)
 	return spawn_manager.choose_spawn(occupied, ConfigStore.match_tuning.spawn_safety_radius)
 
+func _update_local_bots() -> void:
+	var any_attack_started := false
+	var candidates: Array = _build_bot_candidates()
+	for peer_id in bot_controllers.keys():
+		var player := player_nodes.get(peer_id, null) as PlayerController
+		if player == null:
+			continue
+		if not player.stats.alive:
+			player.set_input_vector(Vector2.ZERO)
+			continue
+		var controller := bot_controllers.get(peer_id) as LocalBotController
+		var decision: Dictionary = controller.build_decision(
+			peer_id,
+			player.global_position,
+			player.get_attack_facing(),
+			player.stats.growth_level,
+			candidates
+		)
+		player.set_input_vector(decision.get("move_input", Vector2.ZERO))
+		player.set_attack_facing(decision.get("facing", player.get_attack_facing()))
+		if decision.get("attack", false):
+			any_attack_started = _handle_attack_for_peer(peer_id, decision.get("facing", player.get_attack_facing()), false) or any_attack_started
+	if any_attack_started:
+		_broadcast_snapshot()
+
+func _build_bot_candidates() -> Array:
+	var candidates: Array = []
+	for player in server_state.get_players():
+		candidates.append({
+			"peer_id": player.peer_id,
+			"position": player.global_position,
+			"alive": player.stats.alive
+		})
+	return candidates
+
 func _get_player_name(peer_id: int) -> String:
 	var player := player_nodes.get(peer_id, null) as PlayerController
 	if player == null:
@@ -220,7 +293,7 @@ func _get_player_name(peer_id: int) -> String:
 	return player.display_name
 
 func _on_player_respawn_requested(peer_id: int) -> void:
-	if not NetworkService.is_server():
+	if not _has_authority():
 		return
 	var player := server_state.get_player(peer_id) as PlayerController
 	if player == null:
@@ -257,3 +330,6 @@ func _on_leave_requested() -> void:
 
 func _is_dedicated_server_mode() -> bool:
 	return "--server" in OS.get_cmdline_args()
+
+func _has_authority() -> bool:
+	return NetworkService.is_server() or GameDirector.is_local_prototype_mode()

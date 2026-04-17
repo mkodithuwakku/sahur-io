@@ -24,6 +24,7 @@ const MENU_BACKGROUND_SHADER = preload("res://resources/shaders/menu_background.
 	$Shell/Center/Frame/Margin/Content/HeroColumn/HeroPills/PillSecondary,
 	$Shell/Center/Frame/Margin/Content/HeroColumn/HeroPills/PillTertiary
 ]
+@onready var local_prototype_button: Button = $Shell/Center/Frame/Margin/Content/ActionColumn/Buttons/LocalPrototypeButton
 @onready var host_button: Button = $Shell/Center/Frame/Margin/Content/ActionColumn/Buttons/TopRow/HostButton
 @onready var join_button: Button = $Shell/Center/Frame/Margin/Content/ActionColumn/Buttons/TopRow/JoinButton
 @onready var settings_button: Button = $Shell/Center/Frame/Margin/Content/ActionColumn/Buttons/BottomRow/SettingsButton
@@ -45,7 +46,8 @@ func _ready() -> void:
 	_set_settings_visible(false, true)
 	name_input.text = GameDirector.local_player_name if not GameDirector.local_player_name.is_empty() else GameDirector.generate_guest_name()
 	ip_input.text = NetworkService.server_ip
-	status_label.text = "Choose Host Match to start a local arena or Join Match for LAN testing."
+	status_label.text = "Choose Local Prototype for an offline fight against CPU opponents, Host Match for LAN hosting, or Join Match to connect."
+	local_prototype_button.pressed.connect(_on_local_prototype_pressed)
 	host_button.pressed.connect(_on_host_pressed)
 	join_button.pressed.connect(_on_join_pressed)
 	settings_button.pressed.connect(func() -> void:
@@ -73,7 +75,13 @@ func _ready() -> void:
 	)
 	NetworkService.instance.connection_status_changed.connect(_set_status)
 	call_deferred("_play_intro")
-	host_button.grab_focus()
+	local_prototype_button.grab_focus()
+
+func _on_local_prototype_pressed() -> void:
+	AudioService.play_ui_click()
+	var error: int = GameDirector.start_local_prototype(name_input.text)
+	if error != OK:
+		_set_status("Unable to start local prototype. Error code %d" % error)
 
 func _on_host_pressed() -> void:
 	AudioService.play_ui_click()
@@ -127,6 +135,7 @@ func _apply_visual_theme() -> void:
 	for pill in hero_pills:
 		pill.add_theme_stylebox_override("panel", _rounded_style(Color(1, 1, 1, 0.04), Color(1, 1, 1, 0.08), 1, 18, 14, 12))
 
+	_style_action_button(local_prototype_button, Color(0.56, 0.36, 0.14, 0.98), Color(0.67, 0.44, 0.18, 1.0), Color(0.45, 0.28, 0.1, 1.0))
 	_style_action_button(host_button, Color(0.18, 0.53, 0.46, 0.96), Color(0.24, 0.61, 0.53, 1.0), Color(0.14, 0.42, 0.37, 1.0))
 	_style_action_button(join_button, Color(0.2, 0.32, 0.55, 0.96), Color(0.26, 0.4, 0.65, 1.0), Color(0.15, 0.25, 0.44, 1.0))
 	_style_action_button(settings_button, Color(0.12, 0.16, 0.21, 0.94), Color(0.16, 0.21, 0.27, 1.0), Color(0.09, 0.12, 0.16, 1.0))
@@ -159,7 +168,7 @@ func _apply_typography() -> void:
 		label.add_theme_color_override("font_color", Color(0.88, 0.92, 0.96))
 	for input in [name_input, ip_input]:
 		input.add_theme_font_size_override("font_size", 18)
-	for button in [host_button, join_button, settings_button, quit_button, close_settings_button]:
+	for button in [local_prototype_button, host_button, join_button, settings_button, quit_button, close_settings_button]:
 		button.add_theme_font_size_override("font_size", 18)
 	vibration_toggle.add_theme_font_size_override("font_size", 16)
 
@@ -173,6 +182,7 @@ func _refresh_layout_metrics() -> void:
 	var button_height := 68.0 if compact else 76.0
 	name_input.custom_minimum_size.y = input_height
 	ip_input.custom_minimum_size.y = input_height
+	local_prototype_button.custom_minimum_size.y = button_height + 2.0
 	host_button.custom_minimum_size.y = button_height
 	join_button.custom_minimum_size.y = button_height
 	settings_button.custom_minimum_size.y = button_height - 4.0
@@ -219,7 +229,7 @@ func _set_settings_visible(visible: bool, immediate: bool = false) -> void:
 			settings_backdrop.visible = false
 			settings_panel.visible = false
 		)
-		settings_button.grab_focus()
+		local_prototype_button.grab_focus()
 
 func _on_settings_backdrop_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:

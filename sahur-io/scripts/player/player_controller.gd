@@ -24,6 +24,7 @@ var is_local_player: bool = false
 var body_material: StandardMaterial3D = StandardMaterial3D.new()
 var head_material: StandardMaterial3D = StandardMaterial3D.new()
 var bat_material: StandardMaterial3D = StandardMaterial3D.new()
+var local_indicator_material: StandardMaterial3D = StandardMaterial3D.new()
 
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var mesh_root: Node3D = $MeshRoot
@@ -32,7 +33,9 @@ var bat_material: StandardMaterial3D = StandardMaterial3D.new()
 @onready var head_mesh: MeshInstance3D = $MeshRoot/BodyPivot/Head
 @onready var bat_pivot: Node3D = $MeshRoot/BodyPivot/BatPivot
 @onready var bat_mesh: MeshInstance3D = $MeshRoot/BodyPivot/BatPivot/Bat
+@onready var local_indicator: MeshInstance3D = $LocalIndicator
 @onready var name_label: Label3D = $NameLabel
+@onready var you_label: Label3D = $YouLabel
 
 func setup(new_peer_id: int, new_display_name: String, local_peer_id: int, has_server_authority: bool, bounds: Vector2) -> void:
 	peer_id = new_peer_id
@@ -50,7 +53,14 @@ func _ready() -> void:
 	body_mesh.material_override = body_material
 	head_mesh.material_override = head_material
 	bat_mesh.material_override = bat_material
-	name_label.text = display_name
+	local_indicator.material_override = local_indicator_material
+	local_indicator_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	local_indicator_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	local_indicator_material.emission_enabled = true
+	local_indicator_material.emission = Color(0.24, 0.95, 0.78)
+	local_indicator_material.emission_energy_multiplier = 1.1
+	name_label.text = _get_name_label_text()
+	you_label.text = "YOU"
 	_sync_visual_state(true)
 
 func _physics_process(delta: float) -> void:
@@ -232,7 +242,7 @@ func _simulate_movement(delta: float) -> void:
 
 func _sync_visual_state(_instant: bool) -> void:
 	if name_label != null:
-		name_label.text = display_name
+		name_label.text = _get_name_label_text()
 	var growth_scale: float = growth.get_scale(stats, ConfigStore.player_tuning)
 	if mesh_root != null:
 		mesh_root.scale = Vector3.ONE * growth_scale
@@ -241,12 +251,19 @@ func _sync_visual_state(_instant: bool) -> void:
 	body_material.albedo_color = _get_body_color()
 	head_material.albedo_color = _get_head_color()
 	bat_material.albedo_color = _get_bat_color()
+	local_indicator_material.albedo_color = Color(0.24, 0.95, 0.78, 0.52)
 	if mesh_root != null:
 		mesh_root.visible = stats.alive
 	if collision_shape != null:
 		collision_shape.disabled = not stats.alive
 	if name_label != null:
-		name_label.modulate = Color.WHITE if stats.alive else Color(1.0, 0.8, 0.8, 0.8)
+		name_label.modulate = Color(0.88, 1.0, 0.95) if is_local_player and stats.alive else (Color.WHITE if stats.alive else Color(1.0, 0.8, 0.8, 0.8))
+	if local_indicator != null:
+		local_indicator.visible = is_local_player and stats.alive
+		local_indicator.scale = Vector3.ONE * _get_local_indicator_base_scale(growth_scale)
+	if you_label != null:
+		you_label.visible = is_local_player and stats.alive
+		you_label.modulate = Color(0.5, 1.0, 0.88, 0.96)
 
 func _update_visuals(delta: float) -> void:
 	var attack_swing: float = sin(combat.get_animation_weight() * PI)
@@ -255,6 +272,10 @@ func _update_visuals(delta: float) -> void:
 	if body_pivot != null and stats.alive:
 		var move_amount: float = clampf(Vector2(velocity.x, velocity.z).length() / maxf(ConfigStore.player_tuning.base_move_speed, 0.01), 0.0, 1.0)
 		body_pivot.position.y = 0.18 + sin(Time.get_ticks_msec() * 0.015) * 0.04 * move_amount
+	if local_indicator != null and local_indicator.visible:
+		var pulse := 1.0 + sin(Time.get_ticks_msec() * 0.01) * 0.06
+		var target_scale := _get_local_indicator_base_scale(growth.get_scale(stats, ConfigStore.player_tuning)) * pulse
+		local_indicator.scale = local_indicator.scale.lerp(Vector3.ONE * target_scale, clamp(delta * 8.0, 0.0, 1.0))
 	rotation.y = lerp_angle(rotation.y, MathUtils.yaw_from_direction(desired_facing), clamp(delta * 10.0, 0.0, 1.0))
 
 func _get_body_color() -> Color:
@@ -274,3 +295,9 @@ func _get_bat_color() -> Color:
 	if not stats.alive:
 		return Color(0.3, 0.28, 0.25)
 	return Color(0.44, 0.27, 0.15)
+
+func _get_name_label_text() -> String:
+	return "%s  [YOU]" % display_name if is_local_player else display_name
+
+func _get_local_indicator_base_scale(growth_scale: float) -> float:
+	return clamp(0.95 + (growth_scale - 1.0) * 0.3, 0.95, 1.35)

@@ -5,10 +5,18 @@ const NetworkService = preload("res://scripts/network/network_manager.gd")
 
 const MAIN_MENU_SCENE := preload("res://scenes/main/MainMenu.tscn")
 const GAME_WORLD_SCENE := preload("res://scenes/main/GameWorld.tscn")
+const DEFAULT_LOCAL_CPU_COUNT := 4
+
+enum MatchMode {
+	ONLINE,
+	LOCAL_PROTOTYPE
+}
 
 static var local_player_name: String = ""
 static var root_container: Node = null
 static var active_scene: Node = null
+static var current_match_mode: MatchMode = MatchMode.ONLINE
+static var local_prototype_cpu_count: int = 0
 
 func _ready() -> void:
 	randomize()
@@ -38,6 +46,8 @@ static func show_game_world() -> void:
 
 static func start_host(display_name: String) -> int:
 	local_player_name = sanitize_name(display_name)
+	current_match_mode = MatchMode.ONLINE
+	local_prototype_cpu_count = 0
 	NetworkService.local_player_name = local_player_name
 	var error: int = NetworkService.host_match()
 	if error == OK:
@@ -46,13 +56,33 @@ static func start_host(display_name: String) -> int:
 
 static func start_join(display_name: String, ip_address: String) -> int:
 	local_player_name = sanitize_name(display_name)
+	current_match_mode = MatchMode.ONLINE
+	local_prototype_cpu_count = 0
 	NetworkService.local_player_name = local_player_name
 	var error: int = NetworkService.join_match(ip_address)
 	if error == OK:
 		show_game_world()
 	return error
 
+static func start_local_prototype(display_name: String, cpu_count: int = DEFAULT_LOCAL_CPU_COUNT) -> int:
+	local_player_name = sanitize_name(display_name)
+	current_match_mode = MatchMode.LOCAL_PROTOTYPE
+	local_prototype_cpu_count = maxi(cpu_count, 1)
+	NetworkService.local_player_name = local_player_name
+	NetworkService.close_peer()
+	NetworkService.set_connection_status("Local Prototype · %d CPU Opponents" % local_prototype_cpu_count)
+	show_game_world()
+	return OK
+
+static func is_local_prototype_mode() -> bool:
+	return current_match_mode == MatchMode.LOCAL_PROTOTYPE
+
+static func get_local_prototype_cpu_count() -> int:
+	return local_prototype_cpu_count
+
 static func leave_to_menu() -> void:
+	current_match_mode = MatchMode.ONLINE
+	local_prototype_cpu_count = 0
 	NetworkService.close_peer()
 	show_main_menu()
 
@@ -80,12 +110,14 @@ static func _ensure_input_actions() -> void:
 static func _add_key_action(action: String, keycode: Key) -> void:
 	if not InputMap.has_action(action):
 		InputMap.add_action(action)
-	for event in InputMap.action_get_events(action):
-		if event is InputEventKey and event.keycode == keycode:
-			return
-	var input_event := InputEventKey.new()
-	input_event.keycode = keycode
-	InputMap.action_add_event(action, input_event)
+	if not _has_key_binding(action, keycode, false):
+		var key_event := InputEventKey.new()
+		key_event.keycode = keycode
+		InputMap.action_add_event(action, key_event)
+	if _should_add_physical_binding(keycode) and not _has_key_binding(action, keycode, true):
+		var physical_event := InputEventKey.new()
+		physical_event.physical_keycode = keycode
+		InputMap.action_add_event(action, physical_event)
 
 static func _add_mouse_button_action(action: String, button_index: MouseButton) -> void:
 	if not InputMap.has_action(action):
@@ -96,3 +128,15 @@ static func _add_mouse_button_action(action: String, button_index: MouseButton) 
 	var input_event := InputEventMouseButton.new()
 	input_event.button_index = button_index
 	InputMap.action_add_event(action, input_event)
+
+static func _has_key_binding(action: String, keycode: Key, use_physical: bool) -> bool:
+	for event in InputMap.action_get_events(action):
+		if event is InputEventKey:
+			if use_physical and event.physical_keycode == keycode:
+				return true
+			if not use_physical and event.keycode == keycode:
+				return true
+	return false
+
+static func _should_add_physical_binding(keycode: Key) -> bool:
+	return (keycode >= KEY_A and keycode <= KEY_Z) or (keycode >= KEY_0 and keycode <= KEY_9)
