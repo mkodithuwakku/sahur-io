@@ -20,6 +20,10 @@ var network_state: PlayerNetwork = PlayerNetwork.new()
 var desired_move_input: Vector2 = Vector2.ZERO
 var desired_facing: Vector3 = Vector3.FORWARD
 var external_impulse: Vector3 = Vector3.ZERO
+var move_velocity: Vector3 = Vector3.ZERO
+var hit_react_remaining: float = 0.0
+var defeat_delay_remaining: float = 0.0
+var pending_defeat: bool = false
 var world_bounds: Vector2 = Vector2(20.0, 20.0)
 var authoritative: bool = false
 var is_local_player: bool = false
@@ -29,6 +33,7 @@ var head_material: StandardMaterial3D = StandardMaterial3D.new()
 var bat_material: StandardMaterial3D = StandardMaterial3D.new()
 var local_indicator_material: StandardMaterial3D = StandardMaterial3D.new()
 var custom_model_root: Node3D = null
+var custom_animation_player: AnimationPlayer = null
 var using_custom_model: bool = false
 
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
@@ -95,11 +100,18 @@ func set_attack_facing(facing: Vector3) -> void:
 func get_attack_facing() -> Vector3:
 	return desired_facing
 
+func can_start_attack() -> bool:
+	return stats.alive and not pending_defeat and combat.can_attack()
+
+func is_targetable() -> bool:
+	return stats.alive and not pending_defeat
+
 func begin_attack_preview() -> bool:
-	if not stats.alive or not combat.can_attack():
+	if not can_start_attack():
 		return false
 	combat.begin_attack()
-	AudioService.play_swing()
+	_apply_attack_lunge()
+	_play_attack_feedback()
 	return true
 
 func server_process_attack(candidates: Array) -> Array:
@@ -111,7 +123,7 @@ func server_process_attack(candidates: Array) -> Array:
 	for candidate in candidates:
 		if candidate == null or candidate == self:
 			continue
-		if not candidate.stats.alive:
+		if not candidate.is_targetable():
 			continue
 		if combat.has_hit_target(candidate.peer_id):
 			continue
@@ -127,14 +139,16 @@ func server_process_attack(candidates: Array) -> Array:
 	return hits
 
 func server_receive_hit(damage: float, attacker_peer_id: int, knockback_vector: Vector3) -> bool:
-	if not stats.alive:
+	if not stats.alive or pending_defeat:
 		return false
 	var resistance: float = 1.0 + ConfigStore.player_tuning.knockback_resistance_per_growth * float(maxi(stats.growth_level - 1, 0))
-	external_impulse += knockback_vector / resistance
+	external_impulse = (external_impulse + (knockback_vector / resistance)).limit_length(ConfigStore.combat_tuning.max_received_knockback_speed)
+	hit_react_remaining = ConfigStore.combat_tuning.hit_react_duration
 	var defeated: bool = stats.take_damage(damage, attacker_peer_id)
 	if defeated:
-		stats.begin_respawn(ConfigStore.match_tuning.respawn_delay)
-		AudioService.play_elimination()
+		pending_defeat = true
+		defeat_delay_remaining = ConfigStore.combat_tuning.defeat_delay
+		desired_move_input = Vector2.ZERO
 	else:
 		AudioService.play_hit()
 	_sync_visual_state(true)
@@ -149,7 +163,11 @@ func server_register_kill() -> void:
 func server_respawn(spawn_position: Vector3) -> void:
 	global_position = spawn_position
 	velocity = Vector3.ZERO
+	move_velocity = Vector3.ZERO
 	external_impulse = Vector3.ZERO
+	hit_react_remaining = 0.0
+	defeat_delay_remaining = 0.0
+	pending_defeat = false
 	desired_move_input = Vector2.ZERO
 	desired_facing = Vector3.FORWARD
 	stats.reset_for_respawn(ConfigStore.player_tuning)
@@ -172,6 +190,9 @@ func build_state_snapshot() -> Dictionary:
 		"cooldown": combat.cooldown_remaining,
 		"swing_elapsed": combat.swing_elapsed,
 		"swinging": combat.swinging,
+		"hit_react": hit_react_remaining,
+		"defeat_delay": defeat_delay_remaining,
+		"pending_defeat": pending_defeat,
 		"killer_id": stats.last_attacker_id
 	}
 
@@ -190,6 +211,9 @@ func apply_state_snapshot(snapshot: Dictionary) -> void:
 	combat.cooldown_remaining = snapshot.get("cooldown", combat.cooldown_remaining)
 	combat.swing_elapsed = snapshot.get("swing_elapsed", combat.swing_elapsed)
 	combat.swinging = snapshot.get("swinging", combat.swinging)
+	hit_react_remaining = snapshot.get("hit_react", hit_react_remaining)
+	defeat_delay_remaining = snapshot.get("defeat_delay", defeat_delay_remaining)
+	pending_defeat = snapshot.get("pending_defeat", pending_defeat)
 	var snapshot_yaw: float = snapshot.get("yaw", rotation.y)
 	var direction: Vector3 = Vector3(sin(snapshot_yaw), 0.0, cos(snapshot_yaw))
 	if direction.length_squared() > 0.0001:
@@ -210,6 +234,7 @@ func build_ui_state(killer_name: String = "") -> Dictionary:
 		"health": stats.current_health,
 		"max_health": stats.max_health,
 		"alive": stats.alive,
+		"pending_defeat": pending_defeat,
 		"kills": stats.kills,
 		"deaths": stats.deaths,
 		"growth": stats.growth_level,
@@ -221,6 +246,7 @@ func build_ui_state(killer_name: String = "") -> Dictionary:
 func _authoritative_tick(delta: float) -> void:
 	if stats.alive:
 		_simulate_movement(delta)
+		_tick_hit_reaction(delta)
 		return
 	velocity = Vector3.ZERO
 	if stats.tick_respawn(delta):
@@ -229,16 +255,17 @@ func _authoritative_tick(delta: float) -> void:
 func _prediction_tick(delta: float) -> void:
 	if stats.alive:
 		_simulate_movement(delta)
+		_tick_hit_reaction(delta)
 	else:
 		velocity = Vector3.ZERO
 
 func _simulate_movement(delta: float) -> void:
 	var target_speed: float = growth.get_move_speed(stats, ConfigStore.player_tuning)
-	var desired_velocity: Vector3 = MathUtils.planar_velocity_from_input(desired_move_input, target_speed)
-	velocity.x = move_toward(velocity.x, desired_velocity.x, ConfigStore.player_tuning.acceleration * delta)
-	velocity.z = move_toward(velocity.z, desired_velocity.z, ConfigStore.player_tuning.acceleration * delta)
-	velocity += external_impulse
-	external_impulse = external_impulse.move_toward(Vector3.ZERO, delta * 18.0)
+	var desired_velocity: Vector3 = MathUtils.planar_velocity_from_input(Vector2.ZERO if pending_defeat else desired_move_input, target_speed)
+	move_velocity.x = move_toward(move_velocity.x, desired_velocity.x, ConfigStore.player_tuning.acceleration * delta)
+	move_velocity.z = move_toward(move_velocity.z, desired_velocity.z, ConfigStore.player_tuning.acceleration * delta)
+	external_impulse = external_impulse.move_toward(Vector3.ZERO, delta * ConfigStore.combat_tuning.knockback_decay)
+	velocity = move_velocity + external_impulse
 	move_and_slide()
 	global_position = Vector3(
 		clamp(global_position.x, -world_bounds.x, world_bounds.x),
@@ -247,9 +274,24 @@ func _simulate_movement(delta: float) -> void:
 	)
 	if desired_move_input.length_squared() > 0.0001:
 		desired_facing = Vector3(desired_move_input.x, 0.0, desired_move_input.y).normalized()
-	elif Vector2(velocity.x, velocity.z).length_squared() > 0.0001:
-		desired_facing = Vector3(velocity.x, 0.0, velocity.z).normalized()
+	elif Vector2(move_velocity.x, move_velocity.z).length_squared() > 0.0001:
+		desired_facing = Vector3(move_velocity.x, 0.0, move_velocity.z).normalized()
 	rotation.y = lerp_angle(rotation.y, MathUtils.yaw_from_direction(desired_facing), clamp(delta * 12.0, 0.0, 1.0))
+
+func _tick_hit_reaction(delta: float) -> void:
+	hit_react_remaining = max(hit_react_remaining - delta, 0.0)
+	if not pending_defeat:
+		return
+	defeat_delay_remaining = max(defeat_delay_remaining - delta, 0.0)
+	if defeat_delay_remaining > 0.0:
+		return
+	pending_defeat = false
+	stats.begin_respawn(ConfigStore.match_tuning.respawn_delay)
+	velocity = Vector3.ZERO
+	move_velocity = Vector3.ZERO
+	external_impulse = Vector3.ZERO
+	AudioService.play_elimination()
+	_sync_visual_state(true)
 
 func _sync_visual_state(_instant: bool) -> void:
 	if name_label != null:
@@ -286,11 +328,23 @@ func _sync_visual_state(_instant: bool) -> void:
 
 func _update_visuals(delta: float) -> void:
 	var attack_swing: float = sin(combat.get_animation_weight() * PI)
-	if bat_pivot != null:
-		bat_pivot.rotation.z = -attack_swing * 1.25
+	var hit_react_weight: float = sin((1.0 - clampf(hit_react_remaining / maxf(ConfigStore.combat_tuning.hit_react_duration, 0.001), 0.0, 1.0)) * PI)
+	if bat_pivot != null and not using_custom_model:
+		bat_pivot.rotation.x = 0.35 + attack_swing * 0.55
+		bat_pivot.rotation.y = -0.18 - attack_swing * 0.3
+		bat_pivot.rotation.z = 0.85 - attack_swing * 1.45 + hit_react_weight * 0.16
 	if body_pivot != null and stats.alive:
 		var move_amount: float = clampf(Vector2(velocity.x, velocity.z).length() / maxf(ConfigStore.player_tuning.base_move_speed, 0.01), 0.0, 1.0)
-		body_pivot.position.y = VISUAL_BASE_HEIGHT + sin(Time.get_ticks_msec() * 0.015) * 0.04 * move_amount
+		body_pivot.position.y = VISUAL_BASE_HEIGHT + sin(Time.get_ticks_msec() * 0.015) * 0.04 * move_amount + attack_swing * 0.03
+		body_pivot.rotation.x = hit_react_weight * 0.24
+		body_pivot.rotation.z = 0.0 if using_custom_model else (-attack_swing * 0.12 + hit_react_weight * 0.08)
+	if model_anchor != null and not using_custom_model:
+		model_anchor.rotation.y = attack_swing * 0.28
+		model_anchor.rotation.x = hit_react_weight * 0.32
+		model_anchor.rotation.z = -attack_swing * 0.1 + hit_react_weight * 0.05
+	elif model_anchor != null:
+		model_anchor.rotation.x = hit_react_weight * 0.32
+		model_anchor.rotation.z = hit_react_weight * 0.05
 	if local_indicator != null and local_indicator.visible:
 		var pulse := 1.0 + sin(Time.get_ticks_msec() * 0.01) * 0.06
 		var target_scale := _get_local_indicator_base_scale(growth.get_scale(stats, ConfigStore.player_tuning)) * pulse
@@ -333,7 +387,22 @@ func _attach_custom_model() -> void:
 	model_anchor.add_child(instance)
 	_fit_custom_model(instance)
 	custom_model_root = instance
+	custom_animation_player = instance.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if custom_animation_player != null and custom_animation_player.has_animation("idle"):
+		custom_animation_player.play("idle")
 	using_custom_model = true
+
+func _play_attack_feedback(play_audio: bool = true) -> void:
+	if play_audio:
+		AudioService.play_swing()
+	if custom_animation_player != null and custom_animation_player.has_animation("attack"):
+		custom_animation_player.play("attack")
+
+func _apply_attack_lunge() -> void:
+	var lunge_direction := desired_facing
+	if lunge_direction.length_squared() <= 0.0001:
+		lunge_direction = Vector3.FORWARD
+	external_impulse = (external_impulse + lunge_direction.normalized() * ConfigStore.combat_tuning.get_lunge(stats.growth_level)).limit_length(ConfigStore.combat_tuning.max_received_knockback_speed)
 
 func _fit_custom_model(instance: Node3D) -> void:
 	var bounds := _get_custom_model_bounds(instance)

@@ -31,6 +31,9 @@ func get_move_vector() -> Vector2:
 func consume_attack_pressed() -> bool:
 	return attack_button.consume_attack() or Input.is_action_just_pressed("attack")
 
+func has_queued_attack() -> bool:
+	return attack_button.queued_attack_count > 0
+
 func set_local_state(state: Dictionary) -> void:
 	if state.is_empty():
 		health_bar.max_value = 100.0

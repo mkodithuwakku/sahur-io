@@ -61,16 +61,24 @@ offset_right = 1094.0
 offset_bottom = 188.0
 
 [node name="VirtualJoystick" parent="." instance=ExtResource("2")]
+anchors_preset = 12
+anchor_top = 1.0
+anchor_bottom = 1.0
 offset_left = 28.0
-offset_top = 468.0
+offset_top = -180.0
 offset_right = 208.0
-offset_bottom = 648.0
+offset_bottom = 0.0
 
 [node name="AttackButton" parent="." instance=ExtResource("3")]
-offset_left = 918.0
-offset_top = 502.0
-offset_right = 1058.0
-offset_bottom = 642.0
+anchors_preset = 10
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = -168.0
+offset_top = -146.0
+offset_right = -28.0
+offset_bottom = -6.0
 
 [node name="RespawnOverlay" parent="." instance=ExtResource("5")]
 

@@ -106,6 +106,7 @@ func _play_attack_remote(peer_id: int) -> void:
 	if player == null or player.is_local_player:
 		return
 	player.combat.begin_attack()
+	player._play_attack_feedback(false)
 
 @rpc("authority", "unreliable")
 func _receive_world_snapshot(snapshot: Dictionary) -> void:
@@ -118,22 +119,26 @@ func _collect_local_input(delta: float) -> void:
 	local_player.set_input_vector(move_input)
 	if not GameDirector.is_local_prototype_mode() and not NetworkService.is_server() and input_replicator.tick(delta, ConfigStore.match_tuning.input_send_rate):
 		rpc_id(1, "_server_receive_input", move_input)
-	if hud.consume_attack_pressed():
+	var should_attack := false
+	if local_player.is_targetable() and local_player.combat.can_attack() and hud.has_queued_attack():
+		should_attack = hud.consume_attack_pressed()
+	elif Input.is_action_just_pressed("attack"):
+		should_attack = true
+	if should_attack:
 		var attack_facing: Vector3 = local_player.get_attack_facing()
 		if move_input.length_squared() > 0.0001:
 			attack_facing = Vector3(move_input.x, 0.0, move_input.y).normalized()
 		local_player.set_attack_facing(attack_facing)
-		if local_player.begin_attack_preview():
-			if _has_authority():
-				_handle_attack_for_peer(local_player.peer_id, attack_facing)
-			else:
+		if _has_authority():
+			_handle_attack_for_peer(local_player.peer_id, attack_facing)
+		elif local_player.begin_attack_preview():
 				rpc_id(1, "_server_receive_attack", attack_facing)
 
 func _handle_attack_for_peer(peer_id: int, facing: Vector3, should_broadcast: bool = true) -> bool:
 	var player := server_state.get_player(peer_id) as PlayerController
 	if player == null:
 		return false
-	if not player.stats.alive or not player.combat.can_attack():
+	if not player.can_start_attack():
 		return false
 	player.set_attack_facing(facing)
 	var hits: Array = player.server_process_attack(server_state.get_players())
