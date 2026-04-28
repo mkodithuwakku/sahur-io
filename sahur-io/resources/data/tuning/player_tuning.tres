@@ -5,10 +5,14 @@
 [resource]
 script = ExtResource("1")
 base_move_speed = 8.5
+input_deadzone = 0.08
+input_response_curve = 0.72
 acceleration = 28.0
 deceleration = 40.0
 turn_acceleration = 84.0
 reverse_acceleration = 96.0
+lateral_friction = 72.0
+stop_friction = 18.0
 facing_turn_speed = 20.0
 base_health = 100.0
 health_per_growth = 18.0

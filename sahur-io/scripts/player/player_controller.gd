@@ -90,7 +90,7 @@ func _physics_process(delta: float) -> void:
 	_update_visuals(delta)
 
 func set_input_vector(move_input: Vector2) -> void:
-	desired_move_input = move_input.limit_length(1.0)
+	desired_move_input = _shape_move_input(move_input)
 
 func set_attack_facing(facing: Vector3) -> void:
 	var planar: Vector3 = Vector3(facing.x, 0.0, facing.z)
@@ -272,32 +272,51 @@ func _simulate_movement(delta: float) -> void:
 		global_position.y,
 		clamp(global_position.z, -world_bounds.y, world_bounds.y)
 	)
-	if desired_move_input.length_squared() > 0.0001:
-		desired_facing = Vector3(desired_move_input.x, 0.0, desired_move_input.y).normalized()
+	if move_input.length_squared() > 0.0001:
+		desired_facing = Vector3(move_input.x, 0.0, move_input.y).normalized()
 	elif Vector2(move_velocity.x, move_velocity.z).length_squared() > 0.0001:
 		desired_facing = Vector3(move_velocity.x, 0.0, move_velocity.z).normalized()
 	rotation.y = lerp_angle(rotation.y, MathUtils.yaw_from_direction(desired_facing), clamp(delta * ConfigStore.player_tuning.facing_turn_speed, 0.0, 1.0))
+
+func _shape_move_input(raw_input: Vector2) -> Vector2:
+	var clamped_input := raw_input.limit_length(1.0)
+	var raw_strength := clamped_input.length()
+	var deadzone := clampf(ConfigStore.player_tuning.input_deadzone, 0.0, 0.95)
+	if raw_strength <= deadzone:
+		return Vector2.ZERO
+	var normalized_strength := (raw_strength - deadzone) / (1.0 - deadzone)
+	var curved_strength := pow(normalized_strength, maxf(ConfigStore.player_tuning.input_response_curve, 0.01))
+	return clamped_input.normalized() * clampf(curved_strength, 0.0, 1.0)
 
 func _step_move_velocity(current_velocity: Vector3, desired_velocity: Vector3, delta: float) -> Vector3:
 	var planar_current := Vector2(current_velocity.x, current_velocity.z)
 	var planar_desired := Vector2(desired_velocity.x, desired_velocity.z)
 	if planar_desired.length_squared() <= 0.0001:
-		planar_current = planar_current.move_toward(Vector2.ZERO, ConfigStore.player_tuning.deceleration * delta)
+		var stop_step := (ConfigStore.player_tuning.deceleration + planar_current.length() * ConfigStore.player_tuning.stop_friction) * delta
+		planar_current = planar_current.move_toward(Vector2.ZERO, stop_step)
 		return Vector3(planar_current.x, 0.0, planar_current.y)
 	if planar_current.length_squared() <= 0.0001:
 		planar_current = planar_current.move_toward(planar_desired, ConfigStore.player_tuning.acceleration * delta)
 		return Vector3(planar_current.x, 0.0, planar_current.y)
 
 	var direction_alignment := planar_current.normalized().dot(planar_desired.normalized())
+	var desired_direction := planar_desired.normalized()
+	var desired_speed := planar_desired.length()
+	var forward_speed := planar_current.dot(desired_direction)
+	var forward_velocity := desired_direction * forward_speed
+	var lateral_velocity := planar_current - forward_velocity
 	var response_rate := ConfigStore.player_tuning.acceleration
 	if direction_alignment < -0.2:
 		response_rate = ConfigStore.player_tuning.reverse_acceleration
 	elif direction_alignment < 0.8:
 		response_rate = ConfigStore.player_tuning.turn_acceleration
-	var target_speed := planar_desired.length()
-	var next_velocity := planar_current.move_toward(planar_desired, response_rate * delta)
-	if next_velocity.length() > target_speed:
-		next_velocity = next_velocity.normalized() * target_speed
+
+	forward_speed = move_toward(forward_speed, desired_speed, response_rate * delta)
+	lateral_velocity = lateral_velocity.move_toward(Vector2.ZERO, ConfigStore.player_tuning.lateral_friction * delta)
+
+	var next_velocity := desired_direction * forward_speed + lateral_velocity
+	if next_velocity.length() > desired_speed:
+		next_velocity = next_velocity.normalized() * desired_speed
 	return Vector3(next_velocity.x, 0.0, next_velocity.y)
 
 func _tick_hit_reaction(delta: float) -> void:

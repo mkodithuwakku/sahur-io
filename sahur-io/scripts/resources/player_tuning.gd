@@ -2,10 +2,14 @@ extends Resource
 class_name PlayerTuning
 
 @export var base_move_speed: float = 8.5
+@export var input_deadzone: float = 0.08
+@export var input_response_curve: float = 0.72
 @export var acceleration: float = 28.0
 @export var deceleration: float = 40.0
 @export var turn_acceleration: float = 84.0
 @export var reverse_acceleration: float = 96.0
+@export var lateral_friction: float = 72.0
+@export var stop_friction: float = 18.0
 @export var facing_turn_speed: float = 20.0
 @export var base_health: float = 100.0
 @export var health_per_growth: float = 18.0

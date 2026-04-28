@@ -79,8 +79,16 @@ func test_server_receive_hit_starts_hit_react_before_elimination() -> void:
 	assert_true(player.hit_react_remaining > 0.0, "Hit reaction timer should start on impact")
 	assert_true(player.stats.alive, "Player should remain alive during the hit reaction window")
 
+func test_set_input_vector_applies_deadzone_and_curve() -> void:
+	var player := _create_player(12, "Input", Vector3.ZERO)
+	player.set_input_vector(Vector2(ConfigStore.player_tuning.input_deadzone * 0.5, 0.0))
+	assert_near(0.0, player.desired_move_input.length(), 0.0001)
+	player.set_input_vector(Vector2(0.5, 0.0))
+	assert_true(player.desired_move_input.x > 0.5, "Response curve should make medium joystick input feel assertive")
+	assert_true(player.desired_move_input.x < 1.0, "Partial joystick input should still preserve analog control")
+
 func test_step_move_velocity_preserves_speed_while_cutting_corner() -> void:
-	var player := _create_player(12, "Corner", Vector3.ZERO)
+	var player := _create_player(13, "Corner", Vector3.ZERO)
 	var speed := ConfigStore.player_tuning.base_move_speed
 	var current_velocity := Vector3(speed, 0.0, 0.0)
 	var desired_velocity := Vector3(0.0, 0.0, speed)
@@ -90,13 +98,19 @@ func test_step_move_velocity_preserves_speed_while_cutting_corner() -> void:
 	assert_true(absf(stepped.x) < speed, "Cornering should bleed off old lateral drift")
 
 func test_step_move_velocity_brakes_hard_when_reversing_direction() -> void:
-	var player := _create_player(13, "Reverse", Vector3.ZERO)
+	var player := _create_player(14, "Reverse", Vector3.ZERO)
 	var speed := ConfigStore.player_tuning.base_move_speed
 	var current_velocity := Vector3(0.0, 0.0, speed)
 	var desired_velocity := Vector3(0.0, 0.0, -speed)
 	var stepped := player._step_move_velocity(current_velocity, desired_velocity, 0.1)
 	assert_true(stepped.z < 0.0, "Reversing should flip direction within a short input window")
 	assert_true(stepped.length() <= speed + 0.0001, "Reversing should not exceed max move speed")
+
+func test_step_move_velocity_stops_without_sliding() -> void:
+	var player := _create_player(15, "Stop", Vector3.ZERO)
+	var speed := ConfigStore.player_tuning.base_move_speed
+	var stepped := player._step_move_velocity(Vector3(speed, 0.0, 0.0), Vector3.ZERO, 0.1)
+	assert_true(stepped.length() < speed * 0.5, "Releasing movement should stop quickly instead of drifting")
 
 func _create_player(peer_id: int, display_name: String, world_position: Vector3) -> PlayerController:
 	var player := PlayerScene.instantiate() as PlayerController
