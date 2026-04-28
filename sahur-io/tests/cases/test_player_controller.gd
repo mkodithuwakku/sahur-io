@@ -79,6 +79,25 @@ func test_server_receive_hit_starts_hit_react_before_elimination() -> void:
 	assert_true(player.hit_react_remaining > 0.0, "Hit reaction timer should start on impact")
 	assert_true(player.stats.alive, "Player should remain alive during the hit reaction window")
 
+func test_step_move_velocity_preserves_speed_while_cutting_corner() -> void:
+	var player := _create_player(12, "Corner", Vector3.ZERO)
+	var speed := ConfigStore.player_tuning.base_move_speed
+	var current_velocity := Vector3(speed, 0.0, 0.0)
+	var desired_velocity := Vector3(0.0, 0.0, speed)
+	var stepped := player._step_move_velocity(current_velocity, desired_velocity, 0.1)
+	assert_true(stepped.z > 3.5, "Cornering should redirect into the new heading quickly")
+	assert_true(stepped.length() > speed * 0.75, "Cornering should preserve most of the current speed")
+	assert_true(absf(stepped.x) < speed, "Cornering should bleed off old lateral drift")
+
+func test_step_move_velocity_brakes_hard_when_reversing_direction() -> void:
+	var player := _create_player(13, "Reverse", Vector3.ZERO)
+	var speed := ConfigStore.player_tuning.base_move_speed
+	var current_velocity := Vector3(0.0, 0.0, speed)
+	var desired_velocity := Vector3(0.0, 0.0, -speed)
+	var stepped := player._step_move_velocity(current_velocity, desired_velocity, 0.1)
+	assert_true(stepped.z < 0.0, "Reversing should flip direction within a short input window")
+	assert_true(stepped.length() <= speed + 0.0001, "Reversing should not exceed max move speed")
+
 func _create_player(peer_id: int, display_name: String, world_position: Vector3) -> PlayerController:
 	var player := PlayerScene.instantiate() as PlayerController
 	player.setup(peer_id, display_name, peer_id, true, Vector2(20.0, 20.0))

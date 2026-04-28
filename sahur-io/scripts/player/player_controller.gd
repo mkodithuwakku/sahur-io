@@ -261,9 +261,9 @@ func _prediction_tick(delta: float) -> void:
 
 func _simulate_movement(delta: float) -> void:
 	var target_speed: float = growth.get_move_speed(stats, ConfigStore.player_tuning)
-	var desired_velocity: Vector3 = MathUtils.planar_velocity_from_input(Vector2.ZERO if pending_defeat else desired_move_input, target_speed)
-	move_velocity.x = move_toward(move_velocity.x, desired_velocity.x, ConfigStore.player_tuning.acceleration * delta)
-	move_velocity.z = move_toward(move_velocity.z, desired_velocity.z, ConfigStore.player_tuning.acceleration * delta)
+	var move_input := Vector2.ZERO if pending_defeat else desired_move_input
+	var desired_velocity: Vector3 = MathUtils.planar_velocity_from_input(move_input, target_speed)
+	move_velocity = _step_move_velocity(move_velocity, desired_velocity, delta)
 	external_impulse = external_impulse.move_toward(Vector3.ZERO, delta * ConfigStore.combat_tuning.knockback_decay)
 	velocity = move_velocity + external_impulse
 	move_and_slide()
@@ -276,7 +276,29 @@ func _simulate_movement(delta: float) -> void:
 		desired_facing = Vector3(desired_move_input.x, 0.0, desired_move_input.y).normalized()
 	elif Vector2(move_velocity.x, move_velocity.z).length_squared() > 0.0001:
 		desired_facing = Vector3(move_velocity.x, 0.0, move_velocity.z).normalized()
-	rotation.y = lerp_angle(rotation.y, MathUtils.yaw_from_direction(desired_facing), clamp(delta * 12.0, 0.0, 1.0))
+	rotation.y = lerp_angle(rotation.y, MathUtils.yaw_from_direction(desired_facing), clamp(delta * ConfigStore.player_tuning.facing_turn_speed, 0.0, 1.0))
+
+func _step_move_velocity(current_velocity: Vector3, desired_velocity: Vector3, delta: float) -> Vector3:
+	var planar_current := Vector2(current_velocity.x, current_velocity.z)
+	var planar_desired := Vector2(desired_velocity.x, desired_velocity.z)
+	if planar_desired.length_squared() <= 0.0001:
+		planar_current = planar_current.move_toward(Vector2.ZERO, ConfigStore.player_tuning.deceleration * delta)
+		return Vector3(planar_current.x, 0.0, planar_current.y)
+	if planar_current.length_squared() <= 0.0001:
+		planar_current = planar_current.move_toward(planar_desired, ConfigStore.player_tuning.acceleration * delta)
+		return Vector3(planar_current.x, 0.0, planar_current.y)
+
+	var direction_alignment := planar_current.normalized().dot(planar_desired.normalized())
+	var response_rate := ConfigStore.player_tuning.acceleration
+	if direction_alignment < -0.2:
+		response_rate = ConfigStore.player_tuning.reverse_acceleration
+	elif direction_alignment < 0.8:
+		response_rate = ConfigStore.player_tuning.turn_acceleration
+	var target_speed := planar_desired.length()
+	var next_velocity := planar_current.move_toward(planar_desired, response_rate * delta)
+	if next_velocity.length() > target_speed:
+		next_velocity = next_velocity.normalized() * target_speed
+	return Vector3(next_velocity.x, 0.0, next_velocity.y)
 
 func _tick_hit_reaction(delta: float) -> void:
 	hit_react_remaining = max(hit_react_remaining - delta, 0.0)
